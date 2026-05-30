@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Class — Inventario de Vinos</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --wine: #7B1F3A;
+    --wine-light: #A83256;
+    --wine-pale: rgba(123,31,58,0.15);
+    --gold: #C9A84C;
+    --dark: #120A0D;
+    --surface: #1C1015;
+    --card: #241318;
+    --border: #3A1E26;
+    --text: #F5EDD8;
+    --muted: #9A7A82;
+    --green: #5BAD78;
+    --red: #C96060;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--dark); color: var(--text); min-height: 100vh; max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+
+  header {
+    background: linear-gradient(135deg, var(--surface), var(--dark));
+    border-bottom: 1px solid var(--border);
+    padding: 18px 20px 14px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--gold); }
+  .brand span { font-size: 0.75rem; font-family: 'DM Sans', sans-serif; color: var(--muted); font-weight: 400; display: block; margin-top: 1px; }
+  .sync-btn { background: var(--card); border: 1px solid var(--border); color: var(--gold); border-radius: 20px; padding: 5px 12px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .sync-btn.spinning .sync-icon { display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 0.68rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab-icon { font-size: 1.1rem; display: block; margin-bottom: 2px; }
+
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* SUMMARY */
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--gold); line-height: 1; }
+  .stat-box.wine .stat-num { color: var(--wine-light); }
+  .stat-box.green .stat-num { color: var(--green); }
+  .stat-label { font-size: 0.62rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* SEARCH & FILTERS */
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search-wrap input { padding-left: 40px; }
+  .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-chip { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all 0.15s; white-space: nowrap; }
+  .filter-chip.active { background: var(--wine); color: #fff; border-color: var(--wine); }
+
+  /* VINO CARD */
+  .vino-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .vino-icon {
+    font-size: 1.8rem;
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .vino-icon.tinto  { background: linear-gradient(135deg, #4A0E1E, #7B1F3A); }
+  .vino-icon.blanco { background: linear-gradient(135deg, #3D3010, #7A6020); }
+  .vino-icon.rose   { background: linear-gradient(135deg, #5A1530, #C06080); }
+  .vino-icon.espumante { background: linear-gradient(135deg, #1A2A3A, #2A4A6A); }
+  .vino-icon.otro   { background: linear-gradient(135deg, #1A1A2A, #3A3A5A); }
+  .vino-info { flex: 1; min-width: 0; }
+  .vino-nombre { font-weight: 600; font-size: 0.92rem; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vino-bodega { font-size: 0.75rem; color: var(--gold); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vino-tipo-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .badge-tinto    { background: rgba(123,31,58,0.3); color: #E8809A; }
+  .badge-blanco   { background: rgba(120,96,32,0.3); color: #E8C870; }
+  .badge-rose     { background: rgba(192,96,128,0.3); color: #F0A0B8; }
+  .badge-espumante{ background: rgba(42,74,106,0.3); color: #80B8E8; }
+  .badge-otro     { background: rgba(80,80,120,0.3); color: #B0B0E8; }
+  .vino-stock-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stock-pill { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .pill-total { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .pill-out   { background: rgba(201,96,96,0.15); color: var(--red); }
+  .pill-avail { background: rgba(91,173,120,0.15); color: var(--green); }
+  .vino-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  .btn-sm { font-size: 0.72rem; font-weight: 600; padding: 7px 11px; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; }
+  .btn-salida  { background: var(--wine); color: #fff; }
+  .btn-entrada { background: var(--green); color: #fff; }
+  .btn-sm:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* FORMS */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card-title { font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--gold); margin-bottom: 14px; }
+  .form-group { margin-bottom: 14px; }
+  label { font-size: 0.75rem; color: var(--muted); font-weight: 500; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.92rem; padding: 11px 14px; outline: none; transition: border-color 0.2s; -webkit-appearance: none; }
+  input:focus, select:focus { border-color: var(--wine-light); }
+  select option { background: var(--surface); }
+
+  /* TIPO SELECTOR */
+  .tipo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 6px; }
+  .tipo-btn {
+    background: var(--surface);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 8px 4px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.62rem;
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .tipo-btn .tipo-emoji { font-size: 1.4rem; display: block; margin-bottom: 3px; }
+  .tipo-btn.selected { border-color: var(--wine-light); background: var(--wine-pale); color: var(--text); }
+
+  .btn-primary { width: 100%; background: var(--wine); color: #fff; border: none; border-radius: 12px; padding: 14px; font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: opacity 0.2s; margin-top: 4px; }
+  .btn-primary:active { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 20px; width: 100%; max-width: 480px; animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 4px; margin: 0 auto 16px; }
+  .modal-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-sal { background: rgba(123,31,58,0.3); color: #E8809A; }
+  .badge-ent { background: rgba(91,173,120,0.2); color: var(--green); }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; margin-bottom: 3px; }
+  .modal-bodega { font-size: 0.78rem; color: var(--gold); margin-bottom: 12px; }
+  .modal-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 14px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .btn-cancel  { flex: 1; background: var(--card); color: var(--muted); border: 1px solid var(--border); border-radius: 12px; padding: 13px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; cursor: pointer; }
+  .btn-confirm { flex: 2; border: none; border-radius: 12px; padding: 13px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+  .btn-confirm.danger  { background: var(--wine); color: #fff; }
+  .btn-confirm.success { background: var(--green); color: #fff; }
+  .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* HISTORIAL */
+  .mov-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .mov-item:last-child { border-bottom: none; }
+  .mov-dot { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+  .dot-salida  { background: rgba(123,31,58,0.2); }
+  .dot-entrada { background: rgba(91,173,120,0.15); }
+  .mov-body { flex: 1; }
+  .mov-name { font-size: 0.85rem; font-weight: 600; }
+  .mov-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .mov-qty { font-size: 0.88rem; font-weight: 700; align-self: center; flex-shrink: 0; }
+  .qty-salida  { color: #E8809A; }
+  .qty-entrada { color: var(--green); }
+
+  /* STATES */
+  .loading { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .loading-spinner { font-size: 2rem; display: block; animation: spin 1s linear infinite; margin-bottom: 10px; }
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-icon { font-size: 3rem; margin-bottom: 10px; }
+  .empty p { font-size: 0.88rem; line-height: 1.5; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--card); border: 1px solid var(--wine-light); color: var(--text); padding: 10px 20px; border-radius: 30px; font-size: 0.82rem; font-weight: 500; opacity: 0; pointer-events: none; transition: all 0.3s; white-space: nowrap; z-index: 300; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand">Class Catering <span>Inventario de Vinos</span></div>
+    <button class="sync-btn" onclick="syncAll()" id="sync-btn"><span class="sync-icon">🔄</span> Sync</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="goTab('inventario')"><span class="tab-icon">🍷</span>Vinos</div>
+  <div class="tab" onclick="goTab('movimiento')"><span class="tab-icon">↕️</span>Mover</div>
+  <div class="tab" onclick="goTab('historial')"><span class="tab-icon">📋</span>Historial</div>
+  <div class="tab" onclick="goTab('agregar')"><span class="tab-icon">➕</span>Nuevo</div>
+</div>
+
+<!-- INVENTARIO -->
+<div class="page active" id="page-inventario">
+  <div class="summary-grid">
+    <div class="stat-box"><div class="stat-num" id="s-tipos">—</div><div class="stat-label">Tipos</div></div>
+    <div class="stat-box wine"><div class="stat-num" id="s-total">—</div><div class="stat-label">Botellas total</div></div>
+    <div class="stat-box green"><div class="stat-num" id="s-avail">—</div><div class="stat-label">Disponibles</div></div>
+  </div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="search-inv" placeholder="Buscar vino o bodega..." oninput="renderInventario()"/></div>
+  <div class="filter-bar" id="tipo-filters"></div>
+  <div id="inventario-list"><div class="loading"><span class="loading-spinner">🍷</span>Cargando vinos...</div></div>
+</div>
+
+<!-- MOVIMIENTO -->
+<div class="page" id="page-movimiento">
+  <div class="card">
+    <div class="card-title">Registrar Movimiento</div>
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="mov-tipo">
+        <option value="salida">🍷 Salida — sale del inventario</option>
+        <option value="entrada">📥 Entrada — ingresa al inventario</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Vino</label>
+      <select id="mov-vino"></select>
+    </div>
+    <div class="form-group">
+      <label>Cantidad (botellas)</label>
+      <input type="number" id="mov-qty" min="1" value="1"/>
+    </div>
+    <div class="form-group">
+      <label>Cliente / Evento</label>
+      <input type="text" id="mov-cliente" placeholder="Ej: Boda García, Cumpleaños..."/>
+    </div>
+    <div class="form-group">
+      <label>Nota</label>
+      <input type="text" id="mov-nota" placeholder="Opcional..."/>
+    </div>
+    <button class="btn-primary" id="btn-registrar" onclick="registrarMovimiento()">Registrar</button>
+  </div>
+</div>
+
+<!-- HISTORIAL -->
+<div class="page" id="page-historial">
+  <div class="filter-bar">
+    <div class="filter-chip active" onclick="setHistFiltro('todo',this)">Todo</div>
+    <div class="filter-chip" onclick="setHistFiltro('salida',this)">🍷 Salidas</div>
+    <div class="filter-chip" onclick="setHistFiltro('entrada',this)">📥 Entradas</div>
+  </div>
+  <div id="historial-list"><div class="loading"><span class="loading-spinner">⏳</span>Cargando...</div></div>
+</div>
+
+<!-- AGREGAR -->
+<div class="page" id="page-agregar">
+  <div class="card">
+    <div class="card-title">Nuevo Vino</div>
+    <div class="form-group">
+      <label>Nombre del vino</label>
+      <input type="text" id="new-nombre" placeholder="Ej: Malbec Reserva"/>
+    </div>
+    <div class="form-group">
+      <label>Bodega</label>
+      <input type="text" id="new-bodega" placeholder="Ej: Catena Zapata, Don Pascual..."/>
+    </div>
+    <div class="form-group">
+      <label>Tipo</label>
+      <div class="tipo-grid" id="tipo-grid"></div>
+    </div>
+    <div class="form-group">
+      <label>Cantidad en stock (botellas)</label>
+      <input type="number" id="new-stock" min="1" value="12"/>
+    </div>
+    <button class="btn-primary" id="btn-agregar" onclick="agregarVino()">Agregar Vino</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-badge" id="modal-badge"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-bodega" id="modal-bodega"></div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="form-group">
+      <label>Cantidad (botellas)</label>
+      <input type="number" id="modal-qty" min="1" value="1"/>
+    </div>
+    <div class="form-group">
+      <label>Cliente / Evento</label>
+      <input type="text" id="modal-cliente" placeholder="Opcional..."/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-confirm" id="modal-confirm" onclick="confirmarModal()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbzkxiLvbnHH65iT9krKylosXwsvfO7_1I5OOVLkrDt72fAmEIGhvYz_MD7vCcMBC3hsdg/exec';
+
+const TIPOS = [
+  { key: 'tinto',     label: 'Tinto',     emoji: '🍷' },
+  { key: 'blanco',    label: 'Blanco',    emoji: '🥂' },
+  { key: 'rose',      label: 'Rosé',      emoji: '🌸' },
+  { key: 'espumante', label: 'Espum.',    emoji: '🍾' },
+  { key: 'otro',      label: 'Otro',      emoji: '🫙' },
+];
+
+let vinos = [];
+let historial = [];
+let selectedTipo = 'tinto';
+let pendingModal = null;
+let histFiltro = 'todo';
+let activeTipo = 'Todos';
+
+async function api(params) {
+  const url = API + '?' + new URLSearchParams(params);
+  const res = await fetch(url);
+  return await res.json();
+}
+
+async function syncAll() {
+  const btn = document.getElementById('sync-btn');
+  btn.classList.add('spinning');
+  try {
+    const [r1, r2] = await Promise.all([api({action:'getVinos'}), api({action:'getHistVinos'})]);
+    if (r1.vinos)      vinos     = r1.vinos;
+    if (r2.historial)  historial = r2.historial;
+    renderInventario();
+    renderMovSelect();
+    renderHistorial();
+    toast('✅ Sincronizado');
+  } catch(e) { toast('❌ Error de conexión', true); }
+  btn.classList.remove('spinning');
+}
+
+function goTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['inventario','movimiento','historial','agregar'][i] === tab);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'movimiento') renderMovSelect();
+  if (tab === 'historial')  renderHistorial();
+}
+
+// ---- INVENTARIO ----
+function getTipoEmoji(tipo) { return TIPOS.find(t => t.key === tipo)?.emoji || '🍷'; }
+function getTipoLabel(tipo) { return TIPOS.find(t => t.key === tipo)?.label || tipo; }
+
+function renderTipoFilters() {
+  const tiposEnUso = ['Todos', ...new Set(vinos.map(v => v.tipo))];
+  document.getElementById('tipo-filters').innerHTML = tiposEnUso.map(t => {
+    const label = t === 'Todos' ? 'Todos' : getTipoEmoji(t) + ' ' + getTipoLabel(t);
+    return `<div class="filter-chip ${t===activeTipo?'active':''}" onclick="setTipo('${t}',this)">${label}</div>`;
+  }).join('');
+}
+function setTipo(t, el) {
+  activeTipo = t;
+  document.querySelectorAll('#tipo-filters .filter-chip').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  renderInventario();
+}
+
+function renderInventario() {
+  renderTipoFilters();
+  const q = document.getElementById('search-inv').value.toLowerCase();
+  const filtered = vinos.filter(v =>
+    (v.nombre.toLowerCase().includes(q) || (v.bodega||'').toLowerCase().includes(q)) &&
+    (activeTipo === 'Todos' || v.tipo === activeTipo)
+  );
+
+  const totalBotellas = vinos.reduce((a,b) => a + b.stock, 0);
+  const totalFuera    = vinos.reduce((a,b) => a + (b.salidas||0), 0);
+  document.getElementById('s-tipos').textContent  = vinos.length;
+  document.getElementById('s-total').textContent  = totalBotellas;
+  document.getElementById('s-avail').textContent  = totalBotellas - totalFuera;
+
+  if (!filtered.length) {
+    document.getElementById('inventario-list').innerHTML = `<div class="empty"><div class="empty-icon">🍷</div><p>No hay vinos todavía.<br>Agregá uno en "Nuevo".</p></div>`;
+    return;
+  }
+  document.getElementById('inventario-list').innerHTML = filtered.map(v => {
+    const avail = v.stock - (v.salidas||0);
+    return `<div class="vino-card">
+      <div class="vino-icon ${v.tipo}">${getTipoEmoji(v.tipo)}</div>
+      <div class="vino-info">
+        <div class="vino-nombre">${v.nombre}</div>
+        <div class="vino-bodega">${v.bodega || '—'}</div>
+        <div class="vino-tipo-badge badge-${v.tipo}">${getTipoLabel(v.tipo)}</div>
+        <div class="vino-stock-row">
+          <span class="stock-pill pill-total">Total: ${v.stock}</span>
+          <span class="stock-pill pill-out">Fuera: ${v.salidas||0}</span>
+          <span class="stock-pill pill-avail">Disp: ${avail}</span>
+        </div>
+      </div>
+      <div class="vino-actions">
+        <button class="btn-sm btn-salida"  onclick="openModal('salida','${v.id}')"  ${avail<=0?'disabled':''}>🍷 Salida</button>
+        <button class="btn-sm btn-entrada" onclick="openModal('entrada','${v.id}')" ${(v.salidas||0)<=0?'disabled':''}>📥 Entrada</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- MODAL ----
+function openModal(tipo, vinoId) {
+  const v = vinos.find(x => x.id == vinoId);
+  if (!v) return;
+  pendingModal = { tipo, vinoId };
+  const avail = v.stock - (v.salidas||0);
+  document.getElementById('modal-title').textContent  = getTipoEmoji(v.tipo) + ' ' + v.nombre;
+  document.getElementById('modal-bodega').textContent = v.bodega || '';
+  document.getElementById('modal-qty').value = 1;
+  document.getElementById('modal-cliente').value = '';
+  const badge   = document.getElementById('modal-badge');
+  const confirm = document.getElementById('modal-confirm');
+  if (tipo === 'salida') {
+    badge.textContent = '🍷 Registrar Salida';
+    badge.className = 'modal-badge badge-sal';
+    document.getElementById('modal-sub').textContent = `Disponible: ${avail} botella${avail!==1?'s':''}`;
+    confirm.className = 'btn-confirm danger';
+    confirm.textContent = 'Confirmar Salida';
+  } else {
+    badge.textContent = '📥 Registrar Entrada';
+    badge.className = 'modal-badge badge-ent';
+    document.getElementById('modal-sub').textContent = `Fuera del stock: ${v.salidas||0} botella${(v.salidas||0)!==1?'s':''}`;
+    confirm.className = 'btn-confirm success';
+    confirm.textContent = 'Confirmar Entrada';
+  }
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(e) {
+  if (!e || e.target.id === 'modal') {
+    document.getElementById('modal').classList.remove('open');
+    pendingModal = null;
+  }
+}
+async function confirmarModal() {
+  if (!pendingModal) return;
+  const qty     = parseInt(document.getElementById('modal-qty').value) || 1;
+  const cliente = document.getElementById('modal-cliente').value.trim();
+  const btn     = document.getElementById('modal-confirm');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  try {
+    const r = await api({ action:'movVino', tipo: pendingModal.tipo, vinoId: pendingModal.vinoId, qty, cliente });
+    if (r.error) { toast('❌ ' + r.error, true); }
+    else {
+      toast(pendingModal.tipo === 'salida' ? '🍷 Salida registrada' : '📥 Entrada registrada');
+      document.getElementById('modal').classList.remove('open');
+      pendingModal = null;
+      await syncAll();
+    }
+  } catch(e) { toast('❌ Error de conexión', true); }
+  btn.disabled = false;
+}
+
+// ---- MOVIMIENTO ----
+function renderMovSelect() {
+  document.getElementById('mov-vino').innerHTML = vinos.map(v =>
+    `<option value="${v.id}">${getTipoEmoji(v.tipo)} ${v.nombre} — Disp: ${v.stock-(v.salidas||0)}</option>`
+  ).join('');
+}
+async function registrarMovimiento() {
+  const tipo    = document.getElementById('mov-tipo').value;
+  const vinoId  = document.getElementById('mov-vino').value;
+  const qty     = parseInt(document.getElementById('mov-qty').value) || 1;
+  const cliente = document.getElementById('mov-cliente').value.trim();
+  const nota    = document.getElementById('mov-nota').value.trim();
+  const btn     = document.getElementById('btn-registrar');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  try {
+    const r = await api({ action:'movVino', tipo, vinoId, qty, cliente, nota });
+    if (r.error) { toast('❌ ' + r.error, true); }
+    else {
+      toast(tipo === 'salida' ? '🍷 Salida registrada' : '📥 Entrada registrada');
+      document.getElementById('mov-qty').value = 1;
+      document.getElementById('mov-cliente').value = '';
+      document.getElementById('mov-nota').value = '';
+      await syncAll();
+    }
+  } catch(e) { toast('❌ Error de conexión', true); }
+  btn.disabled = false; btn.textContent = 'Registrar';
+}
+
+// ---- HISTORIAL ----
+function setHistFiltro(f, el) {
+  histFiltro = f;
+  document.querySelectorAll('.filter-bar .filter-chip').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  renderHistorial();
+}
+function renderHistorial() {
+  const h = histFiltro === 'todo' ? historial : historial.filter(x => x.tipo === histFiltro);
+  if (!h.length) {
+    document.getElementById('historial-list').innerHTML = `<div class="empty"><div class="empty-icon">📋</div><p>Sin movimientos todavía.</p></div>`;
+    return;
+  }
+  document.getElementById('historial-list').innerHTML = `<div class="card" style="padding:8px 14px">` +
+    h.map(m => `<div class="mov-item">
+      <div class="mov-dot ${m.tipo==='salida'?'dot-salida':'dot-entrada'}">${m.tipo==='salida'?'🍷':'📥'}</div>
+      <div class="mov-body">
+        <div class="mov-name">${m.vinoNombre}</div>
+        <div class="mov-meta">${m.fecha}${m.cliente?' · '+m.cliente:''}${m.nota?' · '+m.nota:''}</div>
+      </div>
+      <div class="mov-qty ${m.tipo==='salida'?'qty-salida':'qty-entrada'}">${m.tipo==='salida'?'-':'+'}${m.qty}</div>
+    </div>`).join('') + `</div>`;
+}
+
+// ---- AGREGAR ----
+function initTipoGrid() {
+  document.getElementById('tipo-grid').innerHTML = TIPOS.map(t =>
+    `<div class="tipo-btn ${t.key===selectedTipo?'selected':''}" onclick="selectTipo('${t.key}',this)">
+      <span class="tipo-emoji">${t.emoji}</span>${t.label}
+    </div>`
+  ).join('');
+}
+function selectTipo(t, el) {
+  selectedTipo = t;
+  document.querySelectorAll('.tipo-btn').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+}
+async function agregarVino() {
+  const nombre = document.getElementById('new-nombre').value.trim();
+  const bodega = document.getElementById('new-bodega').value.trim();
+  const stock  = parseInt(document.getElementById('new-stock').value) || 1;
+  if (!nombre) { toast('⚠️ Escribí el nombre del vino'); return; }
+  const btn = document.getElementById('btn-agregar');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  try {
+    const r = await api({ action:'addVino', nombre, bodega, tipo: selectedTipo, stock });
+    if (r.error) { toast('❌ ' + r.error, true); }
+    else {
+      toast('✅ Vino agregado');
+      document.getElementById('new-nombre').value = '';
+      document.getElementById('new-bodega').value = '';
+      document.getElementById('new-stock').value  = 12;
+      await syncAll();
+      goTab('inventario');
+    }
+  } catch(e) { toast('❌ Error de conexión', true); }
+  btn.disabled = false; btn.textContent = 'Agregar Vino';
+}
+
+// ---- TOAST ----
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ---- INIT ----
+initTipoGrid();
+syncAll();
+</script>
+</body>
+</html>
